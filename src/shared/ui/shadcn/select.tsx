@@ -217,10 +217,15 @@ function Select({
             position="popper"
             sideOffset={6}
             className={cn(
-              'z-[220] w-[var(--radix-select-trigger-width)] min-w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[2rem] border-2 border-[#8ea8cf] bg-[#53667f]/95 p-2 text-slate-100 shadow-[0_26px_56px_rgba(15,23,42,0.42)] backdrop-blur-2xl',
+              'z-[220] overflow-hidden rounded-[2rem] border-2 border-[#8ea8cf] bg-[#53667f]/95 p-2 text-slate-100 shadow-[0_26px_56px_rgba(15,23,42,0.42)] backdrop-blur-2xl',
               'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
               'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95'
             )}
+            style={{
+              width: 'var(--radix-select-trigger-width)',
+              minWidth: 'max(var(--radix-select-trigger-width), 14rem)',
+              maxWidth: 'calc(100vw - 1rem)',
+            }}
           >
             <SelectPrimitive.Viewport className="max-h-[320px]">
               {options.map((option) => (
@@ -229,7 +234,7 @@ function Select({
                   value={option.value}
                   disabled={option.disabled}
                   className={cn(
-                    'relative flex min-h-12 cursor-pointer select-none items-center rounded-[1.5rem] py-2.5 pl-11 pr-4 text-[17px] font-semibold leading-tight whitespace-normal text-slate-100/95 outline-none transition-colors',
+                    'relative flex min-h-12 cursor-pointer select-none items-center rounded-[1.5rem] py-2.5 pl-11 pr-4 text-[17px] font-semibold leading-tight whitespace-normal break-words text-slate-100/95 outline-none transition-colors',
                     'focus:bg-[#6c7f99] focus:text-white',
                     'data-[state=checked]:bg-gradient-to-b data-[state=checked]:from-[#56a8ff] data-[state=checked]:to-[#1f63ff] data-[state=checked]:text-white',
                     'data-[state=checked]:shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]',
