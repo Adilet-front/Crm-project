@@ -1,11 +1,18 @@
-import type { FC } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties, FC, PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, Calendar, Check, ChevronLeft, ChevronRight, LogOut, UserRound } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   readSidebarCollapsed,
   writeSidebarCollapsed,
 } from '@/app/layout/sidebarState';
+import {
+  SIDEBAR_COLLAPSED_WIDTH,
+  SIDEBAR_EXPANDED_WIDTH,
+  SIDEBAR_SNAP_THRESHOLD,
+  resolveDraggedWidth,
+  resolveSidebarWidth,
+} from '@/app/layout/sidebarResize';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   REPORTING_MONTHS,
@@ -25,6 +32,14 @@ const ROLE_LABELS: Record<UserRole, string> = {
   pm: 'Руководитель проектов',
   admin: 'Администратор',
 };
+
+const SIDEBAR_HANDLE_WIDTH = 18;
+
+interface SidebarResizeSession {
+  pointerId: number;
+  startX: number;
+  startWidth: number;
+}
 
 const getMenuLabel = (role: UserRole, label: string) => {
   if (role === 'owner') {
@@ -98,6 +113,9 @@ export const AppLayout: FC = () => {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsed());
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
+  const sidebarResizeSessionRef = useRef<SidebarResizeSession | null>(null);
   const selectedMonthKey = useReportingPeriodStore((state) => state.selectedMonthKey);
   const setMonthByKey = useReportingPeriodStore((state) => state.setMonthByKey);
   const goToPreviousMonth = useReportingPeriodStore((state) => state.goToPreviousMonth);
@@ -133,12 +151,116 @@ export const AppLayout: FC = () => {
     clearByRole(user.role);
   };
 
+  const setSidebarCollapsedAndPersist = (nextValue: boolean) => {
+    setIsSidebarCollapsed(nextValue);
+    writeSidebarCollapsed(nextValue);
+  };
+
   const toggleSidebar = () => {
-    setIsSidebarCollapsed((previousValue) => {
-      const nextValue = !previousValue;
-      writeSidebarCollapsed(nextValue);
-      return nextValue;
-    });
+    setSidebarCollapsedAndPersist(!isSidebarCompact);
+    setDragWidth(null);
+    setIsDraggingSidebar(false);
+    sidebarResizeSessionRef.current = null;
+  };
+
+  const effectiveSidebarWidth = dragWidth ?? resolveSidebarWidth(isSidebarCollapsed);
+  const isSidebarCompact = effectiveSidebarWidth < SIDEBAR_SNAP_THRESHOLD;
+  const getSidebarTextClasses = (expandedMaxWidthClass: string) =>
+    cn(
+      'overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out',
+      isSidebarCompact
+        ? 'md:pointer-events-none md:max-w-0 md:opacity-0 md:-translate-x-2'
+        : `md:opacity-100 md:translate-x-0 ${expandedMaxWidthClass}`
+    );
+  const sidebarDesktopStyle = useMemo(
+    () =>
+      ({
+        '--sidebar-width': `${effectiveSidebarWidth}px`,
+      }) as CSSProperties,
+    [effectiveSidebarWidth]
+  );
+
+  const finishSidebarDragging = (finalWidth: number) => {
+    const nextCollapsed = finalWidth < SIDEBAR_SNAP_THRESHOLD;
+
+    setSidebarCollapsedAndPersist(nextCollapsed);
+    setDragWidth(null);
+    setIsDraggingSidebar(false);
+    sidebarResizeSessionRef.current = null;
+  };
+
+  const handleSidebarResizePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const startWidth = resolveSidebarWidth(isSidebarCollapsed);
+    sidebarResizeSessionRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth,
+    };
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragWidth(startWidth);
+    setIsDraggingSidebar(true);
+  };
+
+  const handleSidebarResizePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const session = sidebarResizeSessionRef.current;
+
+    if (!session || event.pointerId !== session.pointerId) {
+      return;
+    }
+
+    const nextWidth = resolveDraggedWidth(session.startWidth, event.clientX - session.startX);
+    setDragWidth(nextWidth);
+  };
+
+  const handleSidebarResizePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const session = sidebarResizeSessionRef.current;
+
+    if (!session || event.pointerId !== session.pointerId) {
+      return;
+    }
+
+    const finalWidth = resolveDraggedWidth(session.startWidth, event.clientX - session.startX);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    finishSidebarDragging(finalWidth);
+  };
+
+  const handleSidebarResizePointerCancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const session = sidebarResizeSessionRef.current;
+
+    if (!session || event.pointerId !== session.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    finishSidebarDragging(session.startWidth);
+  };
+
+  const handleSidebarResizeLostPointerCapture = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const session = sidebarResizeSessionRef.current;
+
+    if (!session || event.pointerId !== session.pointerId) {
+      return;
+    }
+
+    finishSidebarDragging(dragWidth ?? session.startWidth);
   };
 
   useEffect(() => {
@@ -171,23 +293,24 @@ export const AppLayout: FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
-      <aside
-        className={cn(
-          'border-b border-slate-800/70 bg-slate-900 text-slate-100 md:fixed md:inset-y-0 md:left-0 md:flex md:flex-col md:border-b-0 md:border-r md:transition-[width] md:duration-300 md:ease-in-out motion-reduce:transition-none',
-          isSidebarCollapsed ? 'md:w-24' : 'md:w-72'
-        )}
-      >
+        <aside
+          className={cn(
+            'relative border-b border-slate-800/70 bg-slate-900 text-slate-100 md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:flex-col md:border-b-0 md:border-r md:[width:var(--sidebar-width)] md:duration-300 md:ease-in-out motion-reduce:transition-none',
+            isDraggingSidebar ? 'md:transition-none' : 'md:transition-[width]'
+          )}
+          style={sidebarDesktopStyle}
+        >
         <div
           className={cn(
             'flex items-center border-b border-slate-800/70 px-6 py-6',
-            isSidebarCollapsed && 'md:flex-col md:justify-center md:gap-3 md:px-4'
+            isSidebarCompact && 'md:flex-col md:justify-center md:gap-3 md:px-4'
           )}
         >
-          <div className={cn('flex items-center gap-4', isSidebarCollapsed && 'md:justify-center md:gap-0')}>
+          <div className={cn('flex items-center gap-4', isSidebarCompact && 'md:justify-center md:gap-0')}>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-xl font-black text-white shadow-lg shadow-brand-500/30">
               ₣
             </div>
-            <div className={cn(isSidebarCollapsed && 'md:hidden')}>
+            <div className={getSidebarTextClasses('md:max-w-[180px]')}>
               <h1 className="text-lg font-bold tracking-tight text-white">
                 Finance<span className="text-brand-300">Pro</span>
               </h1>
@@ -200,18 +323,18 @@ export const AppLayout: FC = () => {
           <button
             type="button"
             onClick={toggleSidebar}
-            aria-label={isSidebarCollapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
-            aria-expanded={!isSidebarCollapsed}
+            aria-label={isSidebarCompact ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
+            aria-expanded={!isSidebarCompact}
             className={cn(
               'hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800/60 text-slate-300 transition-colors hover:border-brand-400/40 hover:text-white md:inline-flex',
-              isSidebarCollapsed ? 'md:ml-0' : 'md:ml-auto'
+              isSidebarCompact ? 'md:ml-0' : 'md:ml-auto'
             )}
           >
-            {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {isSidebarCompact ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
         </div>
 
-        <nav className={cn('space-y-2 overflow-y-auto px-4 py-4 md:flex-1', isSidebarCollapsed && 'md:px-2')}>
+        <nav className={cn('space-y-2 overflow-y-auto px-4 py-4 md:flex-1', isSidebarCompact && 'md:px-2')}>
           {navigation.map((item) => {
             const Icon = NAVIGATION_ICON_MAP[item.icon];
             const menuLabel = getMenuLabel(user.role, item.label);
@@ -223,8 +346,8 @@ export const AppLayout: FC = () => {
                 title={menuLabel}
                 className={({ isActive }) =>
                   cn(
-                    'group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200',
-                    isSidebarCollapsed && 'md:justify-center md:px-3',
+                    'group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-200 md:overflow-hidden',
+                    isSidebarCompact && 'md:justify-center md:px-3 md:gap-0',
                     isActive
                       ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/30'
                       : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
@@ -232,15 +355,17 @@ export const AppLayout: FC = () => {
                 }
               >
                 <Icon className="h-5 w-5 shrink-0" />
-                <span className={cn('font-medium', isSidebarCollapsed && 'md:hidden')}>{menuLabel}</span>
+                <span className={cn('font-medium', getSidebarTextClasses('md:max-w-[11rem]'))}>
+                  {menuLabel}
+                </span>
               </NavLink>
             );
           })}
         </nav>
 
-        <div className={cn('border-t border-slate-800/70 px-4 py-4', isSidebarCollapsed && 'md:px-2')}>
-          <div className={cn('mb-3 rounded-2xl bg-slate-800/70 p-3', isSidebarCollapsed && 'md:p-2')}>
-            <div className={cn('flex items-center gap-3', isSidebarCollapsed && 'md:justify-center md:gap-0')}>
+        <div className={cn('border-t border-slate-800/70 px-4 py-4', isSidebarCompact && 'md:px-2')}>
+          <div className={cn('mb-3 rounded-2xl bg-slate-800/70 p-3', isSidebarCompact && 'md:p-2')}>
+            <div className={cn('flex items-center gap-3', isSidebarCompact && 'md:justify-center md:gap-0')}>
               <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-200 text-sm font-bold text-slate-900">
                 {showAvatarImage ? (
                   <img
@@ -260,7 +385,7 @@ export const AppLayout: FC = () => {
                 )}
               </div>
 
-              <div className={cn('min-w-0', isSidebarCollapsed && 'md:hidden')}>
+              <div className={cn('min-w-0', getSidebarTextClasses('md:max-w-[10.5rem]'))}>
                 <p className="truncate text-sm font-semibold text-white">{user.name}</p>
                 <p className="truncate text-xs text-slate-400">{ROLE_LABELS[user.role]}</p>
               </div>
@@ -274,21 +399,49 @@ export const AppLayout: FC = () => {
             title="Выйти"
             className={cn(
               'flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-200',
-              isSidebarCollapsed && 'md:h-10 md:px-0'
+              isSidebarCompact && 'md:h-10 md:px-0'
             )}
           >
             <LogOut className="h-4 w-4" />
-            <span className={cn(isSidebarCollapsed && 'md:hidden')}>Выйти</span>
+            <span className={getSidebarTextClasses('md:max-w-[6rem]')}>Выйти</span>
           </button>
         </div>
-      </aside>
+          <button
+            type="button"
+            aria-label="Изменить ширину боковой панели"
+            aria-orientation="vertical"
+            aria-valuemin={SIDEBAR_COLLAPSED_WIDTH}
+            aria-valuemax={SIDEBAR_EXPANDED_WIDTH}
+            aria-valuenow={Math.round(effectiveSidebarWidth)}
+            onPointerDown={handleSidebarResizePointerDown}
+            onPointerMove={handleSidebarResizePointerMove}
+            onPointerUp={handleSidebarResizePointerUp}
+            onPointerCancel={handleSidebarResizePointerCancel}
+            onLostPointerCapture={handleSidebarResizeLostPointerCapture}
+            className={cn(
+              'group absolute inset-y-0 -right-2 z-50 hidden items-center justify-center touch-none select-none md:flex',
+              'cursor-col-resize'
+            )}
+            style={{ width: `${SIDEBAR_HANDLE_WIDTH}px` }}
+          >
+            <span
+              className={cn(
+                'pointer-events-none h-16 w-[2px] rounded-full bg-slate-300/40 transition-colors duration-200',
+                isDraggingSidebar
+                  ? 'bg-brand-400/90'
+                  : 'group-hover:bg-slate-300/80'
+              )}
+            />
+          </button>
+        </aside>
 
-      <div
-        className={cn(
-          'flex min-h-screen flex-1 flex-col md:transition-[margin-left] md:duration-300 md:ease-in-out motion-reduce:transition-none',
-          isSidebarCollapsed ? 'md:ml-24' : 'md:ml-72'
-        )}
-      >
+        <div
+          className={cn(
+            'flex min-h-screen flex-1 flex-col md:[margin-left:var(--sidebar-width)] md:duration-300 md:ease-in-out motion-reduce:transition-none',
+            isDraggingSidebar ? 'md:transition-none' : 'md:transition-[margin-left]'
+          )}
+          style={sidebarDesktopStyle}
+        >
         <header className="sticky top-0 z-30 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 md:px-8 md:py-5">
             <div className="relative isolate w-full max-w-[620px]">
@@ -499,7 +652,7 @@ export const AppLayout: FC = () => {
         <footer className="border-t border-slate-100 px-4 py-4 text-center text-xs text-slate-400 md:px-8">
           © 2026 Finance Pro Dashboard. Все права защищены.
         </footer>
+        </div>
       </div>
-    </div>
   );
 };
