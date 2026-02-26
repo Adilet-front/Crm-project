@@ -508,7 +508,7 @@ export default function OperationsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleAddOperation} className="space-y-6 p-8">
+            <form onSubmit={handleAddOperation} noValidate className="space-y-6 p-8">
               <div className="space-y-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">Сумма</label>
@@ -533,7 +533,7 @@ export default function OperationsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">Счет</label>
                     <AppSelect
@@ -559,7 +559,7 @@ export default function OperationsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">Контрагент</label>
                     <input
@@ -586,7 +586,7 @@ export default function OperationsPage() {
                 </div>
               </div>
 
-              <div className="flex gap-4 pt-4">
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:gap-4 sm:pt-4">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}

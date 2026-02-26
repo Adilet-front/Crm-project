@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Briefcase, ChevronRight, Plus, Search, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFinanceStore, type Project } from '@/entities/finance/model/store';
 import { canPerformAction } from '@/entities/user/model/access';
@@ -88,7 +89,7 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">{isPM ? 'Мои проекты' : 'Проекты'}</h1>
@@ -211,10 +212,13 @@ export default function ProjectsPage() {
                     </div>
                     <span className="text-xs font-bold text-slate-700">{project.manager}</span>
                   </div>
-                  <button className="group/btn flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-brand-500 transition-colors hover:text-brand-700">
+                  <Link
+                    to={`/projects/${project.id}`}
+                    className="group/btn flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-brand-500 transition-colors hover:text-brand-700"
+                  >
                     Детали
                     <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>

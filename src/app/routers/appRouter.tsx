@@ -12,6 +12,7 @@ import { NotFoundPage } from '@/pages/common/NotFoundPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import OperationsPage from '@/pages/operations/OperationsPage';
 import PlanningPage from '@/pages/planning/PlanningPage';
+import ProjectDetailsPage from '@/pages/projects/ProjectDetailsPage';
 import ProjectsPage from '@/pages/projects/ProjectsPage';
 
 const DASHBOARD_ROLES: UserRole[] = SECTION_ACCESS.dashboard;
@@ -56,6 +57,14 @@ export const appRouter = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={PROJECT_ROLES}>
             <ProjectsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'projects/:projectId',
+        element: (
+          <ProtectedRoute allowedRoles={PROJECT_ROLES}>
+            <ProjectDetailsPage />
           </ProtectedRoute>
         ),
       },

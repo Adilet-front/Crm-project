@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
-import { Check } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import { cn } from './utils';
 
 interface NativeLikeSelectProps
@@ -179,6 +179,7 @@ function Select({
     options,
     getFallbackValue,
   });
+  const [isOpen, setIsOpen] = React.useState(false);
 
   const handleValueChange = (nextValue: string) => {
     if (!isControlled) {
@@ -198,7 +199,13 @@ function Select({
 
   return (
     <>
-      <SelectPrimitive.Root value={resolvedValue} onValueChange={handleValueChange} disabled={disabled}>
+      <SelectPrimitive.Root
+        value={resolvedValue}
+        onValueChange={handleValueChange}
+        disabled={disabled}
+        open={isOpen}
+        onOpenChange={setIsOpen}
+      >
         <SelectPrimitive.Trigger
           data-slot="select"
           id={id}
@@ -206,10 +213,23 @@ function Select({
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledby}
           aria-describedby={ariaDescribedby}
-          className={cn('app-select', className)}
+          className={cn(
+            'app-select group/select flex min-w-0 items-center overflow-hidden text-left whitespace-nowrap',
+            className
+          )}
           aria-required={required}
         >
-          <SelectPrimitive.Value className="truncate text-left" />
+          <span className="min-w-0 flex-1 overflow-hidden pr-2 text-left whitespace-nowrap [&>span]:block [&>span]:truncate [&>span]:whitespace-nowrap">
+            <SelectPrimitive.Value />
+          </span>
+          <SelectPrimitive.Icon className="ml-auto inline-flex h-4 w-4 shrink-0 items-center justify-center">
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 text-[#8fa4c5] transition-all duration-250 ease-out',
+                isOpen && 'translate-y-[1px] rotate-180 text-[#c6d8f5]'
+              )}
+            />
+          </SelectPrimitive.Icon>
         </SelectPrimitive.Trigger>
 
         <SelectPrimitive.Portal>
@@ -218,8 +238,9 @@ function Select({
             sideOffset={6}
             className={cn(
               'z-[220] overflow-hidden rounded-[2rem] border-2 border-[#8ea8cf] bg-[#53667f]/95 p-2 text-slate-100 shadow-[0_26px_56px_rgba(15,23,42,0.42)] backdrop-blur-2xl',
-              'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
-              'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95'
+              'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-top-1.5',
+              'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:slide-out-to-top-1.5',
+              'data-[side=bottom]:data-[state=open]:slide-in-from-top-2 data-[side=top]:data-[state=open]:slide-in-from-bottom-2'
             )}
             style={{
               width: 'var(--radix-select-trigger-width)',
@@ -234,16 +255,19 @@ function Select({
                   value={option.value}
                   disabled={option.disabled}
                   className={cn(
-                    'relative flex min-h-12 cursor-pointer select-none items-center rounded-[1.5rem] py-2.5 pl-11 pr-4 text-[17px] font-semibold leading-tight whitespace-normal break-words text-slate-100/95 outline-none transition-colors',
+                    'relative flex min-h-12 cursor-pointer select-none items-center rounded-[1.5rem] py-2.5 pl-11 pr-4 text-[17px] font-semibold leading-tight whitespace-normal break-words text-slate-100/95 outline-none',
+                    'transition-[background-color,transform,color,box-shadow] duration-200 ease-out',
                     'focus:bg-[#6c7f99] focus:text-white',
                     'data-[state=checked]:bg-gradient-to-b data-[state=checked]:from-[#56a8ff] data-[state=checked]:to-[#1f63ff] data-[state=checked]:text-white',
                     'data-[state=checked]:shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]',
+                    'data-[state=checked]:translate-x-0 data-[state=checked]:[animation:select-item-pop_240ms_ease-out]',
+                    'data-[state=unchecked]:translate-x-1',
                     'data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
                   )}
                 >
                   <span className="pointer-events-none absolute left-4 inline-flex h-5 w-5 items-center justify-center">
-                    <SelectPrimitive.ItemIndicator>
-                      <Check className="h-5 w-5 text-white" />
+                    <SelectPrimitive.ItemIndicator className="animate-in fade-in-0 zoom-in-95 duration-200">
+                      <Check className="h-5 w-5 text-white transition-transform duration-200 ease-out" />
                     </SelectPrimitive.ItemIndicator>
                   </span>
                   <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
