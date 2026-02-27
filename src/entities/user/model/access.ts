@@ -41,7 +41,7 @@ export const ACTION_ACCESS: Record<AccessAction, UserRole[]> = {
   'operations:read': ['owner', 'financial_manager', 'pm'],
   'operations:write': ['financial_manager'],
   'approvals:read': ['owner', 'financial_manager', 'pm'],
-  'approvals:write': ['owner', 'financial_manager'],
+  'approvals:write': ['owner'],
   'admin:read': ['admin'],
   'admin:write': ['admin'],
 };
